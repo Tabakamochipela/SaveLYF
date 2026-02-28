@@ -584,7 +584,37 @@ input,select,textarea{font-family:var(--font);outline:none}
     <input class="auth-fi" id="auth-pass" type="password" placeholder="Enter password">
     <div class="auth-err" id="auth-err">❌ Invalid credentials. Please try again.</div>
     <button class="btn btn-brand btn-lg btn-full" onclick="doLogin()">Sign In Securely →</button>
-    <div class="auth-note">🔐 Demo: <strong>admin</strong> / <strong>savelyf2024</strong></div>
+    <div class="auth-note">🔐 Authorised personnel only · Credentials issued by SaveLYF Admin</div>
+  </div>
+</div>
+
+<!-- ════ PROFILE CREATE/SIGNIN MODAL ════ -->
+<div class="modal-bg" id="profile-modal">
+  <div class="modal-sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-title" id="pm-title">Create Profile</div>
+    <div class="sh-sub" id="pm-sub">Join the SaveLYF community · Free forever</div>
+    <div id="pm-signup-fields">
+      <div class="fg">
+        <label class="fl">Display Name</label>
+        <input class="fi" id="pm-name" type="text" placeholder="e.g. SafeDriver_TM" maxlength="30">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Email Address</label>
+      <input class="fi" id="pm-email" type="email" placeholder="you@example.com">
+    </div>
+    <div class="fg">
+      <label class="fl">Password</label>
+      <input class="fi" id="pm-pass" type="password" placeholder="Min 6 characters">
+    </div>
+    <div class="auth-err" id="pm-err" style="display:none;margin-bottom:12px;padding:9px 13px;border-radius:var(--r-sm);background:rgba(255,23,68,.12);border:1px solid rgba(255,23,68,.28);color:#FF8A9A;font-size:12.5px"></div>
+    <button class="btn btn-brand btn-lg btn-full" id="pm-submit" onclick="submitProfileModal()">Create Profile →</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost btn-full" onclick="closeModal('profile-modal')">Cancel</button>
+    <div style="text-align:center;margin-top:12px;font-size:11.5px;color:var(--tx-3)" id="pm-toggle">
+      Already have an account? <span style="color:var(--brand);cursor:pointer" onclick="toggleProfileModal()">Sign In instead</span>
+    </div>
   </div>
 </div>
 
@@ -837,46 +867,53 @@ input,select,textarea{font-family:var(--font);outline:none}
     <!-- ═══ PROFILE ═══ -->
     <div class="page" id="pg-profile">
       <div class="p-hero">
-        <div class="p-av">👤</div>
-        <div class="p-name" id="p-name">SafeDriver_TM</div>
+        <div class="p-av" id="p-av">👤</div>
+        <div class="p-name" id="p-name">Anonymous Driver</div>
         <div class="p-mode" id="p-mode">Community Reporter · Gaborone</div>
         <div class="p-stats">
           <div class="ps-item"><div class="ps-n" id="p-reports">0</div><div class="ps-l">Reports</div></div>
           <div class="ps-item"><div class="ps-n" id="p-verif">0</div><div class="ps-l">Verified</div></div>
-          <div class="ps-item"><div class="ps-n" id="p-saves">12</div><div class="ps-l">Lives Aided</div></div>
+          <div class="ps-item"><div class="ps-n" id="p-saves">0</div><div class="ps-l">Lives Aided</div></div>
         </div>
       </div>
 
       <div class="p-body">
-        <div class="pts-card mt" style="margin-top:-14px">
-          <div class="pts-n" id="p-pts">2,840</div>
-          <div class="pts-l">SafePoints earned</div>
-          <div class="lvl-bar"><div class="lvl-fill" style="width:71%"></div></div>
-          <div class="lvl-info"><span>Level 5 · Road Guardian</span><span>710 / 1000 to Level 6</span></div>
+        <!-- Anonymous prompt / Profile info card -->
+        <div id="anon-prompt" class="card" style="margin:-14px 0 12px;border-radius:var(--r-xl);padding:16px;text-align:center;box-shadow:var(--shadow-lg)">
+          <div style="font-size:32px;margin-bottom:8px">👤</div>
+          <div style="font-size:15px;font-weight:800;margin-bottom:4px">You are Anonymous</div>
+          <div style="font-size:12px;color:var(--tx-2);margin-bottom:14px;line-height:1.5">Create a free profile to track your reports,<br>earn badges, and appear on the leaderboard.</div>
+          <button class="btn btn-brand btn-full" onclick="openProfileModal()">Create Profile →</button>
+          <div style="margin-top:8px;font-size:11px;color:var(--tx-3)">Already have an account? <span style="color:var(--brand);cursor:pointer" onclick="openProfileModal('signin')">Sign In</span></div>
+        </div>
+
+        <div id="pts-section" style="display:none">
+          <div class="pts-card mt" style="margin-top:-14px">
+            <div class="pts-n" id="p-pts">0</div>
+            <div class="pts-l">SafePoints earned</div>
+            <div class="lvl-bar"><div class="lvl-fill" id="lvl-fill" style="width:0%"></div></div>
+            <div class="lvl-info" id="lvl-info"><span>Level 1 · New Driver</span><span>0 / 100 to Level 2</span></div>
+          </div>
         </div>
 
         <div class="card mb12" style="margin-bottom:12px">
           <div class="ch"><span class="ct">Achievement Badges</span></div>
-          <div class="badge-grid" style="padding:12px">
-            <div class="badge earned"><div class="badge-ic">🏅</div><div class="badge-nm">First Report</div></div>
-            <div class="badge earned"><div class="badge-ic">🚗</div><div class="badge-nm">Road Scout</div></div>
-            <div class="badge earned"><div class="badge-ic">⚡</div><div class="badge-nm">Quick Alert</div></div>
-            <div class="badge earned"><div class="badge-ic">🛡️</div><div class="badge-nm">Guardian</div></div>
-            <div class="badge locked"><div class="badge-ic">🌟</div><div class="badge-nm">Star Driver</div></div>
-            <div class="badge locked"><div class="badge-ic">🗺️</div><div class="badge-nm">Map Maker</div></div>
-            <div class="badge locked"><div class="badge-ic">🏆</div><div class="badge-nm">Champion</div></div>
-            <div class="badge locked"><div class="badge-ic">👑</div><div class="badge-nm">Road King</div></div>
+          <div class="badge-grid" id="badge-grid" style="padding:12px">
+            <!-- populated dynamically -->
           </div>
         </div>
 
         <div class="card" style="margin-bottom:12px">
-          <div class="ch"><span class="ct">Community Leaderboard</span></div>
-          <div style="padding:4px 14px 10px" id="lb-list"><!-- populated --></div>
+          <div class="ch"><span class="ct">Community Leaderboard</span><span id="lb-loading" style="font-size:10px;color:var(--tx-3)">Loading…</span></div>
+          <div style="padding:4px 14px 10px" id="lb-list"></div>
         </div>
 
         <div style="display:flex;gap:10px;margin-bottom:12px">
-          <button class="btn btn-ghost" style="flex:1" onclick="toast('📤 Profile shared!','brand')">📤 Share Profile</button>
+          <button class="btn btn-ghost" id="share-btn" style="flex:1" onclick="shareProfile()">📤 Share Profile</button>
           <button class="btn btn-danger btn-pill" style="flex:1" onclick="triggerEmergency()">🆘 SOS</button>
+        </div>
+        <div id="signout-wrap" style="display:none;margin-bottom:12px">
+          <button class="btn btn-ghost btn-full" onclick="signOutProfile()">🔒 Sign Out of Profile</button>
         </div>
       </div>
     </div><!-- end profile -->
@@ -919,9 +956,19 @@ input,select,textarea{font-family:var(--font);outline:none}
         <div id="acc-list"><!-- populated --></div>
       </div>
 
+      <div class="card mb12 mx16" id="pending-removal-card" style="margin:0 16px 12px;display:none">
+        <div class="ch" style="background:rgba(0,200,83,.06)"><span class="ct" style="color:var(--safe)">✅ Awaiting Removal Confirmation</span></div>
+        <div class="admin-tbl-wrap">
+          <table class="admin-tbl">
+            <thead><tr><th>Road</th><th>Reported Fixed</th><th>Fix Votes</th><th>Confirmed By</th><th>Action</th></tr></thead>
+            <tbody id="pending-removal-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="admin-acts">
         <button class="btn btn-warn" onclick="exportCSV()">⬇ Export CSV</button>
-        <button class="btn btn-ghost" onclick="toast('📧 Report emailed to maintenance team','safe')">📧 Email Report</button>
+        <button class="btn btn-ghost" onclick="adminEmailReport()">📧 Email Report</button>
         <button class="btn btn-danger btn-sm" onclick="doLogout()">🔒 Logout</button>
       </div>
     </div><!-- end admin -->
@@ -1017,6 +1064,11 @@ const App = {
   // Stats
   userReports: 0, userVerifications: 0,
   selectedSev: 'dangerous',
+
+  // Points & profile
+  sessionPoints: 0,
+  alertsGiven: 0,
+  userProfile: null,
 
   // Offline / IndexedDB
   idb: null,             // IndexedDB connection handle
@@ -1365,8 +1417,15 @@ function listenFirebase() {
 
     refreshMapMarkers();
     refreshInsights();
+    buildActivityBars();
     refreshHazardList();
     refreshAdminStats();
+    // Refresh admin table if admin is logged in
+    if (App.adminLoggedIn) {
+      refreshAdminTable();
+      refreshPendingRemoval();
+      refreshAccidentList();
+    }
     updateSyncBadge();
     console.log('[SaveLYF] Firebase→IDB sync:', App.potholes.length, 'potholes');
   }, err => {
@@ -1512,7 +1571,12 @@ function refreshMapMarkers() {
   App.potholeMarkers = [];
 
   App.potholes.forEach(p => {
-    const cls = p.fixed || p.severity==='Fixed' ? 'fixed' :
+    // Potholes pending admin removal are NOT shown to regular users on map
+    // They appear fixed (blue) only to admin users
+    const isRemoved = p.pendingRemoval && !App.adminLoggedIn;
+    if (isRemoved) return;
+
+    const cls = p.fixed || p.pendingRemoval || p.severity==='Fixed' ? 'fixed' :
                 p.severity === 'Dangerous' ? 'danger' :
                 p.severity === 'Moderate'  ? 'moderate' : 'low';
     const glyph = cls==='danger'?'⚠':cls==='moderate'?'!':cls==='fixed'?'✓':'·';
@@ -1794,7 +1858,7 @@ function checkProximityAlerts() {
 
   let closestAhead = null, closestDist = Infinity;
 
-  App.potholes.filter(p => !p.fixed && p.severity !== 'Fixed').forEach(p => {
+  App.potholes.filter(p => !p.fixed && !p.pendingRemoval && p.severity !== 'Fixed').forEach(p => {
     const dist = haversine(App.gps.lat, App.gps.lng, p.lat, p.lng);
     // Only consider potholes within 500m that are in the direction of travel
     if (dist < 500 && isAhead(p.lat, p.lng) && dist < closestDist) {
@@ -1846,6 +1910,7 @@ function triggerAlert(p, dist) {
   const vp = document.getElementById('voice-popup');
   vp.classList.add('show');
   setTimeout(() => vp.classList.remove('show'), 5500);
+  App.alertsGiven++;
 }
 
 function closeAlert() { document.getElementById('alert-slide').classList.remove('show'); }
@@ -1927,8 +1992,14 @@ async function submitReport() {
 
   App.userReports++;
   document.getElementById('p-reports').textContent = App.userReports;
-  const pts = parseInt(document.getElementById('p-pts').textContent.replace(',',''))||2840;
-  document.getElementById('p-pts').textContent = (pts + 50).toLocaleString();
+  addPoints(50);
+  // Sync report count to Firestore user profile
+  if (App.userProfile && App.db && navigator.onLine) {
+    App.db.collection('users').doc(App.firebaseUser.uid).update({
+      reports: firebase.firestore.FieldValue.increment(1),
+      points:  firebase.firestore.FieldValue.increment(50)
+    }).catch(() => {});
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -1971,7 +2042,7 @@ function goPage(name, navId) {
   if (pg) pg.classList.add('active');
   const ni = document.getElementById(navId);
   if (ni) ni.classList.add('active');
-  if (name === 'insights') refreshInsights();
+  if (name === 'insights') { refreshInsights(); buildActivityBars(); }
   if (name === 'profile')  initProfile();
   if (name === 'admin')    initAdmin();
   if (name === 'drive')    refreshHazardList();
@@ -1994,39 +2065,60 @@ function selectRole(el, role) {
   _authRole = role;
 }
 
+/* ══════════════════════════════════════════
+   AUTH — ADMIN PORTAL
+   Credentials loaded from config.js (not visible in app)
+   Two passwords per role — both accepted
+   ══════════════════════════════════════════ */
 function doLogin() {
-  const u = document.getElementById('auth-user').value.trim();
-  const p = document.getElementById('auth-pass').value.trim();
+  const u   = document.getElementById('auth-user').value.trim().toLowerCase();
+  const p   = document.getElementById('auth-pass').value;
   const err = document.getElementById('auth-err');
   const btn = document.querySelector('#auth-screen .btn-brand');
-  btn.textContent = 'Signing in…';
+  btn.textContent = 'Verifying…';
   btn.disabled = true;
 
+  // Credentials come from config.js → window.SAVELYF_CONFIG.adminCredentials
+  // Format: { role: { users:['u1','u2'], passwords:['p1','p2'] } }
+  const creds = (window.SAVELYF_CONFIG && window.SAVELYF_CONFIG.adminCredentials) || {};
+  const roleKey = _authRole; // 'official' | 'engineer' | 'analyst' | 'super'
+  const roleCred = creds[roleKey] || {};
+  const validUsers = (roleCred.users || []).map(x => x.toLowerCase());
+  const validPasses = roleCred.passwords || [];
+
+  // Small artificial delay for security feel
   setTimeout(() => {
-    // Credentials: admin / savelyf2024 (also supports email: admin@gov.bw)
-    const validUser = u === 'admin' || u === 'admin@gov.bw';
-    const validPass = p === 'savelyf2024';
-    if (validUser && validPass) {
+    const userOk = validUsers.length > 0 ? validUsers.includes(u) : false;
+    const passOk = validPasses.length > 0 ? validPasses.includes(p) : false;
+
+    if (userOk && passOk) {
       App.adminLoggedIn = true;
-      App.adminRole = _authRole;
+      App.adminRole = roleKey;
       document.getElementById('auth-screen').classList.remove('show');
       err.classList.remove('show');
-      const roleLabel = {official:'Gov Official',engineer:'Road Engineer',analyst:'Data Analyst',super:'Super Admin'}[_authRole];
+      document.getElementById('auth-user').value = '';
+      document.getElementById('auth-pass').value = '';
+      const roleLabel = {official:'Gov Official',engineer:'Road Engineer',analyst:'Data Analyst',super:'Super Admin'}[roleKey];
       document.getElementById('admin-role-display').textContent = roleLabel;
-      goPage('admin', document.getElementById('nav-admin'));
-      toast('🔐 Admin access granted — Welcome!','safe');
+      initAdmin();
+      goPage('admin', 'nav-admin');
+      toast('🔐 ' + roleLabel + ' access granted', 'safe');
     } else {
       err.classList.add('show');
+      // Clear password on failure for security
+      document.getElementById('auth-pass').value = '';
     }
     btn.textContent = 'Sign In Securely →';
     btn.disabled = false;
-  }, 900);
+  }, 700);
 }
 
 function doLogout() {
   App.adminLoggedIn = false;
-  goPage('dashboard', document.getElementById('nav-map'));
-  toast('🔒 Logged out securely','brand');
+  App.adminRole = null;
+  document.getElementById('admin-role-display').textContent = 'Gov Official';
+  goPage('dashboard', 'nav-map');
+  toast('🔒 Logged out securely', 'brand');
 }
 
 document.getElementById('auth-screen').addEventListener('click', e => {
@@ -2054,25 +2146,43 @@ function toggleTheme() {
    INSIGHTS PAGE
    ══════════════════════════════════════════ */
 function initInsights() {
-  // Activity bars
+  refreshInsights();
+  buildActivityBars();
+}
+
+function buildActivityBars() {
   const bars = document.getElementById('act-bars');
   const lbls = document.getElementById('act-lbls');
-  if (bars && !bars._init) {
-    bars._init = true;
-    const days = ['M','T','W','T','F','S','S'];
-    const vals = [12,18,8,25,31,14,22];
-    const maxV = Math.max(...vals);
-    const cols = ['#2979FF','#2979FF','#2979FF','#FFB300','#FF1744','#2979FF','#FFB300'];
-    vals.forEach((v,i) => {
-      const b = document.createElement('div');
-      b.className = 'act-bar';
-      b.style.cssText = `height:${(v/maxV*66)+4}px;background:${cols[i]};`;
-      b.onclick = () => toast(`${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}: ${v} alerts`,'brand');
-      bars.appendChild(b);
-    });
-    days.forEach(d => { const l=document.createElement('div');l.className='act-lbl';l.textContent=d;lbls.appendChild(l); });
-  }
-  refreshInsights();
+  if (!bars) return;
+  bars.innerHTML = '';
+  lbls.innerHTML = '';
+
+  // Count pothole reports per day of the week from real createdAt timestamps
+  const counts = [0,0,0,0,0,0,0]; // Sun=0..Sat=6
+  App.potholes.forEach(p => {
+    if (p.createdAt) {
+      const d = new Date(p.createdAt).getDay();
+      counts[d]++;
+    }
+  });
+  // Reorder Mon-Sun
+  const ordered = [counts[1],counts[2],counts[3],counts[4],counts[5],counts[6],counts[0]];
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dayLabels = ['M','T','W','T','F','S','S'];
+  const maxV = Math.max(...ordered, 1);
+  ordered.forEach((v,i) => {
+    const pct = (v/maxV);
+    const col = pct > 0.7 ? '#FF1744' : pct > 0.4 ? '#FFB300' : '#2979FF';
+    const b = document.createElement('div');
+    b.className = 'act-bar';
+    b.style.cssText = `height:${(pct*66)+4}px;background:${col};`;
+    b.onclick = () => toast(`${dayNames[i]}: ${v} report${v!==1?'s':''}`, 'brand');
+    bars.appendChild(b);
+    const l = document.createElement('div');
+    l.className = 'act-lbl';
+    l.textContent = dayLabels[i];
+    lbls.appendChild(l);
+  });
 }
 
 function refreshInsights() {
@@ -2125,27 +2235,243 @@ function refreshInsights() {
 /* ══════════════════════════════════════════
    PROFILE PAGE
    ══════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   PROFILE PAGE — FULLY LIVE
+   ══════════════════════════════════════════ */
 function initProfile() {
+  updateProfileUI();
+  loadLeaderboard();
+}
+
+function updateProfileUI() {
+  const hasProfile = !!App.userProfile;
+  const anonPrompt = document.getElementById('anon-prompt');
+  const ptsSection = document.getElementById('pts-section');
+  const signoutWrap = document.getElementById('signout-wrap');
+
+  if (hasProfile) {
+    anonPrompt.style.display = 'none';
+    ptsSection.style.display = 'block';
+    signoutWrap.style.display = 'block';
+    document.getElementById('p-av').textContent = App.userProfile.avatar || '👤';
+    document.getElementById('p-name').textContent = App.userProfile.displayName || 'Driver';
+    document.getElementById('p-mode').textContent = (App.userProfile.role || 'Community Reporter') + ' · Gaborone';
+  } else {
+    anonPrompt.style.display = 'block';
+    ptsSection.style.display = 'none';
+    signoutWrap.style.display = 'none';
+    document.getElementById('p-av').textContent = '👤';
+    document.getElementById('p-name').textContent = 'Anonymous Driver';
+    document.getElementById('p-mode').textContent = 'Community Reporter · Gaborone';
+  }
+
+  // Always show live session stats
+  const pts = App.sessionPoints || 0;
+  const reports = App.userReports || 0;
+  const verifs  = App.userVerifications || 0;
+  document.getElementById('p-reports').textContent = reports;
+  document.getElementById('p-verif').textContent   = verifs;
+  document.getElementById('p-saves').textContent   = Math.floor(reports * 0.7 + verifs * 0.3);
+  document.getElementById('p-pts').textContent     = pts.toLocaleString();
+
+  // Level calculation
+  const levelThresholds = [0,100,300,600,1000,1600,2400,3400,4600,6000];
+  let level = 1;
+  const levelNames = ['New Driver','Road Scout','Alert Driver','Road Guardian','Hazard Hunter','Safety Champion','Road Warrior','Expert Navigator','Road Master','SaveLYF Legend'];
+  for (let i = levelThresholds.length-1; i >= 0; i--) {
+    if (pts >= levelThresholds[i]) { level = i+1; break; }
+  }
+  const nextLvl = levelThresholds[level] || levelThresholds[levelThresholds.length-1];
+  const currLvl = levelThresholds[level-1] || 0;
+  const pct = Math.min(100, Math.round(((pts - currLvl) / (nextLvl - currLvl)) * 100));
+  const lvlFill = document.getElementById('lvl-fill');
+  const lvlInfo = document.getElementById('lvl-info');
+  if (lvlFill) lvlFill.style.width = pct + '%';
+  if (lvlInfo) lvlInfo.innerHTML = `<span>Level ${level} · ${levelNames[Math.min(level-1, levelNames.length-1)]}</span><span>${pts - currLvl} / ${nextLvl - currLvl} to Level ${level+1}</span>`;
+
+  // Render dynamic badges
+  renderBadges(reports, verifs, pts);
+}
+
+function renderBadges(reports, verifs, pts) {
+  const grid = document.getElementById('badge-grid');
+  if (!grid) return;
+  const BADGES = [
+    { id:'first',  ic:'🏅', nm:'First Report',  req: reports >= 1,          tip:'Submit your first report' },
+    { id:'scout',  ic:'🚗', nm:'Road Scout',    req: reports >= 5,          tip:'Submit 5 reports' },
+    { id:'alert',  ic:'⚡', nm:'Quick Alert',   req: App.alertsGiven >= 3,  tip:'Receive 3 pothole alerts' },
+    { id:'guard',  ic:'🛡️', nm:'Guardian',      req: verifs >= 3,           tip:'Verify 3 hazards' },
+    { id:'star',   ic:'🌟', nm:'Star Driver',   req: reports >= 10,         tip:'Submit 10 reports' },
+    { id:'mapper', ic:'🗺️', nm:'Map Maker',     req: reports >= 20,         tip:'Submit 20 reports' },
+    { id:'champ',  ic:'🏆', nm:'Champion',      req: pts >= 1000,           tip:'Earn 1000 SafePoints' },
+    { id:'king',   ic:'👑', nm:'Road King',     req: pts >= 3000,           tip:'Earn 3000 SafePoints' },
+  ];
+  grid.innerHTML = BADGES.map(b => `
+    <div class="badge ${b.req ? 'earned' : 'locked'}" title="${b.tip}">
+      <div class="badge-ic">${b.ic}</div>
+      <div class="badge-nm">${b.nm}</div>
+      ${b.req ? '' : '<div style="font-size:8px;color:var(--tx-3);margin-top:2px">Locked</div>'}
+    </div>`).join('');
+}
+
+async function loadLeaderboard() {
   const lb = document.getElementById('lb-list');
-  if (lb && !lb._init) {
-    lb._init = true;
-    const users = [
-      {r:1,name:'RoadWatchBW',   pts:4210,me:false},
-      {r:2,name:'SafeDriver_K',  pts:3890,me:false},
-      {r:3,name:'SafeDriver_TM', pts:2840,me:true},
-      {r:4,name:'PotholeHunter', pts:2510,me:false},
-      {r:5,name:'GuardianX',     pts:2200,me:false},
-      {r:6,name:'AlertDriver5',  pts:1980,me:false},
-    ];
-    const rc = {1:'gold',2:'silver',3:'bronze'};
-    users.forEach(u => {
-      lb.innerHTML += `<div class="lb-item${u.me?' me':''}">
-        <div class="lb-rank ${rc[u.r]||''}">${u.r}</div>
-        <div style="font-size:18px">👤</div>
-        <div class="lb-name">${u.name}${u.me?` <span class="tag tag-brand" style="font-size:9px">YOU</span>`:''}</div>
-        <div class="lb-pts">${u.pts.toLocaleString()}</div>
-      </div>`;
-    });
+  const lbLoad = document.getElementById('lb-loading');
+  if (!lb) return;
+
+  lb.innerHTML = '';
+  if (lbLoad) lbLoad.textContent = 'Loading…';
+
+  // Fetch from Firebase if available, otherwise show session only
+  let users = [];
+  if (!DEMO_MODE && App.db && navigator.onLine) {
+    try {
+      const snap = await App.db.collection('users').orderBy('points','desc').limit(10).get();
+      users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+      console.warn('[SaveLYF] Leaderboard fetch failed:', e);
+    }
+  }
+
+  // If no Firebase users, show local session as only entry
+  if (users.length === 0) {
+    const myPts = App.sessionPoints || 0;
+    const myName = App.userProfile?.displayName || 'You (Anonymous)';
+    users = [{ id: App.firebaseUser?.uid || 'local', displayName: myName, points: myPts, me: true }];
+  } else {
+    // Mark which entry is the current user
+    const myUid = App.firebaseUser?.uid;
+    users = users.map(u => ({ ...u, me: u.id === myUid }));
+    // Insert self if not in top 10
+    if (!users.find(u => u.me) && App.userProfile) {
+      users.push({ id: myUid, displayName: App.userProfile.displayName, points: App.sessionPoints || 0, me: true, tail: true });
+    }
+  }
+
+  if (lbLoad) lbLoad.textContent = '';
+  const rc = {0:'gold', 1:'silver', 2:'bronze'};
+  lb.innerHTML = users.map((u,i) => `
+    <div class="lb-item${u.me ? ' me' : ''}">
+      <div class="lb-rank ${rc[i] || ''}">${u.tail ? '–' : i+1}</div>
+      <div style="font-size:18px">👤</div>
+      <div class="lb-name">${u.displayName || 'Driver'}${u.me ? ' <span class="tag tag-brand" style="font-size:9px">YOU</span>' : ''}</div>
+      <div class="lb-pts">${(u.points || 0).toLocaleString()}</div>
+    </div>`).join('');
+}
+
+/* ── Profile creation / sign-in modal ── */
+let _pmMode = 'signup'; // 'signup' | 'signin'
+
+function openProfileModal(mode) {
+  _pmMode = mode || 'signup';
+  document.getElementById('pm-title').textContent  = _pmMode === 'signup' ? 'Create Profile' : 'Sign In';
+  document.getElementById('pm-sub').textContent    = _pmMode === 'signup' ? 'Join the SaveLYF community · Free' : 'Welcome back!';
+  document.getElementById('pm-submit').textContent = _pmMode === 'signup' ? 'Create Profile →' : 'Sign In →';
+  document.getElementById('pm-toggle').innerHTML   = _pmMode === 'signup'
+    ? 'Already have an account? <span style="color:var(--brand);cursor:pointer" onclick="toggleProfileModal()">Sign In instead</span>'
+    : 'New here? <span style="color:var(--brand);cursor:pointer" onclick="toggleProfileModal()">Create a Profile</span>';
+  const signupFields = document.getElementById('pm-signup-fields');
+  if (signupFields) signupFields.style.display = _pmMode === 'signup' ? 'block' : 'none';
+  const pmErr = document.getElementById('pm-err');
+  if (pmErr) { pmErr.style.display='none'; pmErr.textContent=''; }
+  document.getElementById('profile-modal').classList.add('show');
+}
+
+function toggleProfileModal() {
+  openProfileModal(_pmMode === 'signup' ? 'signin' : 'signup');
+}
+
+async function submitProfileModal() {
+  const email = document.getElementById('pm-email').value.trim();
+  const pass  = document.getElementById('pm-pass').value;
+  const name  = _pmMode === 'signup' ? (document.getElementById('pm-name')?.value.trim() || '') : '';
+  const pmErr = document.getElementById('pm-err');
+  const btn   = document.getElementById('pm-submit');
+
+  if (!email || !pass) { showPmErr('Please fill in all fields'); return; }
+  if (_pmMode === 'signup' && !name) { showPmErr('Please enter a display name'); return; }
+  if (pass.length < 6) { showPmErr('Password must be at least 6 characters'); return; }
+
+  btn.textContent = _pmMode === 'signup' ? 'Creating…' : 'Signing in…';
+  btn.disabled = true;
+
+  try {
+    if (!App.auth) throw new Error('Firebase Auth not available');
+    let cred;
+    if (_pmMode === 'signup') {
+      cred = await App.auth.createUserWithEmailAndPassword(email, pass);
+      // Save profile to Firestore
+      const profile = {
+        displayName: name,
+        avatar: '👤',
+        role: 'Community Reporter',
+        email: email,
+        points: 0,
+        reports: 0,
+        verifications: 0,
+        createdAt: Date.now()
+      };
+      await App.db.collection('users').doc(cred.user.uid).set(profile);
+      App.userProfile = profile;
+      toast('🎉 Profile created — welcome to SaveLYF!', 'safe');
+    } else {
+      cred = await App.auth.signInWithEmailAndPassword(email, pass);
+      const doc = await App.db.collection('users').doc(cred.user.uid).get();
+      App.userProfile = doc.exists ? doc.data() : { displayName: email.split('@')[0], points: 0 };
+      toast('👋 Welcome back, ' + App.userProfile.displayName + '!', 'safe');
+    }
+    App.firebaseUser = cred.user;
+    closeModal('profile-modal');
+    document.getElementById('pm-email').value = '';
+    document.getElementById('pm-pass').value  = '';
+    if (document.getElementById('pm-name')) document.getElementById('pm-name').value = '';
+    updateProfileUI();
+    loadLeaderboard();
+  } catch(e) {
+    const msgs = {
+      'auth/email-already-in-use': 'Email already in use. Try signing in instead.',
+      'auth/user-not-found':       'No account found. Please create a profile.',
+      'auth/wrong-password':       'Incorrect password. Please try again.',
+      'auth/invalid-email':        'Please enter a valid email address.',
+      'auth/network-request-failed': 'Network error. Please check your connection.',
+    };
+    showPmErr(msgs[e.code] || e.message || 'An error occurred. Please try again.');
+  }
+  btn.textContent = _pmMode === 'signup' ? 'Create Profile →' : 'Sign In →';
+  btn.disabled = false;
+}
+
+function showPmErr(msg) {
+  const el = document.getElementById('pm-err');
+  if (el) { el.textContent = '❌ ' + msg; el.style.display = 'block'; }
+}
+
+async function signOutProfile() {
+  if (App.auth) await App.auth.signOut().catch(() => {});
+  App.userProfile = null;
+  updateProfileUI();
+  toast('🔒 Signed out of profile', 'brand');
+}
+
+function shareProfile() {
+  const name = App.userProfile?.displayName || 'Anonymous Driver';
+  const pts  = App.sessionPoints || 0;
+  const text = `I'm ${name} on SaveLYF — ${pts} SafePoints earned keeping Gaborone roads safe! 🛡️`;
+  if (navigator.share) {
+    navigator.share({ title: 'SaveLYF Profile', text, url: location.href }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(text).then(() => toast('📋 Profile copied to clipboard!','safe')).catch(() => toast('📤 ' + text,'brand'));
+  }
+}
+
+function addPoints(pts) {
+  App.sessionPoints = (App.sessionPoints || 0) + pts;
+  // Sync points to Firestore if signed in
+  if (App.userProfile && App.db && navigator.onLine) {
+    App.db.collection('users').doc(App.firebaseUser.uid).update({
+      points: firebase.firestore.FieldValue.increment(pts),
+      reports: firebase.firestore.FieldValue.increment(0) // keep alive
+    }).catch(() => {});
   }
 }
 
@@ -2177,18 +2503,20 @@ function refreshHazardList() {
 }
 
 /* ══════════════════════════════════════════
-   ADMIN PAGE
+   ADMIN PAGE — FULLY LIVE
    ══════════════════════════════════════════ */
 function initAdmin() {
   if (!App.adminLoggedIn) return;
   startAdminCountdown();
-  populateAdminTable();
-  populateAccidentList();
+  refreshAdminTable();       // always re-render (no _init guard)
+  refreshPendingRemoval();   // pending removal queue
+  refreshAccidentList();     // live accident list from potholes
   refreshAdminStats();
 }
 
 function startAdminCountdown() {
-  const future = new Date(Date.now() + 13*86400000 + 7*3600000);
+  // 30-day data retention timer
+  const future = new Date(Date.now() + 30*86400000);
   const el = document.getElementById('admin-cd');
   if (!el) return;
   clearInterval(App._adminTimer);
@@ -2205,31 +2533,46 @@ function startAdminCountdown() {
 
 function refreshAdminStats() {
   const s = id => document.getElementById(id);
-  const total = App.potholes.length;
-  const urgent = App.potholes.filter(p => (p.risk||0) >= 80 && !p.fixed).length;
-  const fixed  = App.potholes.filter(p => p.fixed || p.severity==='Fixed').length;
-  if (s('as-total'))  s('as-total').textContent  = total;
-  if (s('as-urgent')) s('as-urgent').textContent = urgent;
-  if (s('as-fixed'))  s('as-fixed').textContent  = fixed;
-  if (s('ins-total')) s('ins-total').textContent = total;
+  const active   = App.potholes.filter(p => !p.fixed && !p.pendingRemoval && p.severity !== 'Fixed').length;
+  const urgent   = App.potholes.filter(p => (p.risk||0) >= 80 && !p.fixed && !p.pendingRemoval).length;
+  const pending  = App.potholes.filter(p => p.pendingRemoval).length;
+  const accidents= ACCIDENT_DATA.length;
+  if (s('as-total'))     s('as-total').textContent     = active;
+  if (s('as-urgent'))    s('as-urgent').textContent    = urgent;
+  if (s('as-fixed'))     s('as-fixed').textContent     = pending;
+  if (s('as-accidents')) s('as-accidents').textContent = accidents;
+  if (s('ins-total'))    s('ins-total').textContent    = App.potholes.length;
 }
 
-function populateAdminTable() {
+function refreshAdminTable() {
   const tb = document.getElementById('admin-tbody');
-  if (!tb || tb._init) return;
-  tb._init = true;
-  const data = [...App.potholes].filter(p=>!p.fixed).sort((a,b)=>(b.risk||0)-(a.risk||0)).slice(0,7);
+  if (!tb) return;
+  tb.innerHTML = '';
+
+  // Only show active (not fixed, not pendingRemoval)
+  const data = [...App.potholes]
+    .filter(p => !p.fixed && !p.pendingRemoval && p.severity !== 'Fixed')
+    .sort((a,b) => (b.risk||0) - (a.risk||0))
+    .slice(0, 20); // show up to 20
+
   const priClass = r => r>80?'pri-urgent':r>60?'pri-high':r>40?'pri-medium':'pri-low';
   const priLabel = r => r>80?'URGENT':r>60?'HIGH':r>40?'MEDIUM':'LOW';
+
+  if (data.length === 0) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--tx-3)">No active hazards — all roads clear ✅</td></tr>';
+    return;
+  }
+
   data.forEach((p,i) => {
-    const fixVotes = p.fixVotes || 0;
+    const fv = p.fixVotes || 0;
+    const col = (p.risk||0)>75?'var(--danger)':(p.risk||0)>50?'var(--warn)':'var(--safe)';
     tb.innerHTML += `<tr>
       <td style="font-family:var(--mono)">${i+1}</td>
       <td style="font-weight:700">${p.road}</td>
       <td style="color:var(--tx-2)">Gaborone</td>
       <td style="font-family:var(--mono);color:var(--brand)">${p.reports||0}</td>
-      <td><span class="pri ${priClass(p.risk||0)}">${priLabel(p.risk||0)}</span>${fixVotes>0?`<br><span style="font-size:9px;color:var(--safe)">🔧 ${fixVotes} fix vote${fixVotes>1?'s':''}</span>`:''}</td>
-      <td style="font-family:var(--mono);font-weight:700;color:${(p.risk||0)>75?'var(--danger)':(p.risk||0)>50?'var(--warn)':'var(--safe)'}">${p.risk||0}</td>
+      <td><span class="pri ${priClass(p.risk||0)}">${priLabel(p.risk||0)}</span>${fv>0?`<br><span style="font-size:9px;color:var(--safe)">🔧 ${fv} fix vote${fv>1?'s':''}</span>`:''}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${col}">${p.risk||0}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn btn-safe btn-sm" style="font-size:10px;padding:5px 9px" onclick="adminIssueRepair('${p.id}','${p.road}')">Issue</button>
         <button class="btn btn-brand btn-sm" style="font-size:10px;padding:5px 9px" onclick="adminMarkFixed('${p.id}','${p.road}')">✓ Fixed</button>
@@ -2238,55 +2581,143 @@ function populateAdminTable() {
   });
 }
 
+function refreshPendingRemoval() {
+  const card = document.getElementById('pending-removal-card');
+  const tb   = document.getElementById('pending-removal-tbody');
+  if (!card || !tb) return;
+
+  const pending = App.potholes.filter(p => p.pendingRemoval);
+  card.style.display = pending.length > 0 ? 'block' : 'none';
+  tb.innerHTML = '';
+
+  // Only engineer or super admin can confirm removal
+  const canRemove = ['engineer','super'].includes(App.adminRole);
+
+  pending.forEach(p => {
+    const when = p.fixedAt ? new Date(p.fixedAt).toLocaleDateString('en-BW') : '–';
+    tb.innerHTML += `<tr>
+      <td style="font-weight:700">${p.road}</td>
+      <td style="color:var(--tx-2);font-size:11px">${when}</td>
+      <td style="font-family:var(--mono);color:var(--safe)">${p.fixVotes||0}</td>
+      <td style="color:var(--tx-2);font-size:11px">${p.fixedBy||'Admin'}</td>
+      <td>
+        ${canRemove
+          ? `<button class="btn btn-danger btn-sm" style="font-size:10px" onclick="adminConfirmRemove('${p.id}','${p.road}')">🗑 Confirm Remove</button>`
+          : `<span style="font-size:10px;color:var(--tx-3)">Engineer/Admin only</span>`}
+      </td>
+    </tr>`;
+  });
+}
+
 function adminIssueRepair(id, road) {
   toast(`🔧 Repair order issued for ${road} — team notified`, 'safe');
   if (!DEMO_MODE && navigator.onLine && App.db) {
-    App.db.collection('potholes').doc(id).update({ repairOrdered: true, repairOrderedAt: Date.now() });
+    App.db.collection('potholes').doc(id).update({ repairOrdered: true, repairOrderedAt: Date.now(), repairedBy: App.adminRole });
   }
 }
 
 function adminMarkFixed(id, road) {
-  // Only admin can mark as fixed — updates IDB immediately, Firebase when online
+  // Mark as pendingRemoval — does NOT delete yet. Engineer/Admin must confirm.
   const p = App.potholes.find(x => x.id === id);
-  if (p) { p.fixed = true; p.severity = 'Fixed'; p.risk = 0; }
-
-  // Always update device cache immediately
+  if (p) { p.pendingRemoval = true; p.severity = 'Fixed'; p.risk = 0; p.fixedBy = App.adminRole; p.fixedAt = Date.now(); }
   idbSavePotholes(App.potholes).catch(() => {});
 
   if (!DEMO_MODE && navigator.onLine && App.db) {
-    // Online: write to Firebase (snapshot will confirm IDB is up to date)
     App.db.collection('potholes').doc(id).update({
-      fixed: true, severity: 'Fixed', risk: 0, reports: 0,
+      pendingRemoval: true, severity: 'Fixed', risk: 0,
       fixedAt: Date.now(), fixedBy: App.adminRole
     });
-    toast(`✅ ${road} marked as FIXED in database`, 'safe');
+    toast(`✅ ${road} marked Fixed — awaiting removal confirmation`, 'safe');
   } else if (!DEMO_MODE) {
-    // Offline: IDB already updated; note admin fix does NOT use queue —
-    // admin must confirm again when back online for safety
-    toast(`⚠️ Offline — ${road} fixed locally. Confirm on Firebase when online.`, 'warn');
+    toast(`⚠️ Offline — saved locally. Confirm online.`, 'warn');
   } else {
-    toast(`✅ ${road} marked as Fixed (Demo Mode)`, 'safe');
+    toast(`✅ ${road} marked Fixed (Demo Mode)`, 'safe');
   }
-
-  // Refresh the admin table (reset init flag so it re-renders)
-  const tb = document.getElementById('admin-tbody');
-  if (tb) { tb._init = false; tb.innerHTML = ''; populateAdminTable(); }
-  refreshMapMarkers(); refreshInsights(); refreshAdminStats();
+  refreshAdminTable();
+  refreshPendingRemoval();
+  refreshMapMarkers();
+  refreshInsights();
+  refreshAdminStats();
 }
 
-function populateAccidentList() {
+async function adminConfirmRemove(id, road) {
+  // PERMANENTLY delete from Firebase — pothole disappears everywhere
+  if (!confirm(`Permanently remove "${road}" from the database? This confirms the road is repaired and cannot be undone.`)) return;
+
+  // Remove from local array first
+  App.potholes = App.potholes.filter(p => p.id !== id);
+  idbSavePotholes(App.potholes).catch(() => {});
+
+  if (!DEMO_MODE && navigator.onLine && App.db) {
+    try {
+      await App.db.collection('potholes').doc(id).delete();
+      toast(`🗑️ "${road}" permanently removed from database`, 'safe');
+    } catch(e) {
+      toast(`⚠️ Delete failed — try again when online`, 'warn');
+      console.error('[SaveLYF] Delete failed:', e);
+    }
+  } else {
+    toast(`🗑️ "${road}" removed from device`, 'safe');
+  }
+
+  refreshAdminTable();
+  refreshPendingRemoval();
+  refreshMapMarkers();
+  refreshInsights();
+  refreshAdminStats();
+  refreshHazardList();
+}
+
+function refreshAccidentList() {
   const al = document.getElementById('acc-list');
-  if (!al || al._init) return;
-  al._init = true;
+  if (!al) return;
+  al.innerHTML = '';
+
+  // Show real accident-flagged potholes + static ACCIDENT_DATA
+  const accPotholes = App.potholes.filter(p => p.isAccident);
+  const combined = [...ACCIDENT_DATA, ...accPotholes.map(p => ({
+    lat: p.lat, lng: p.lng, road: p.road,
+    time: p.createdAt ? new Date(p.createdAt).toLocaleTimeString('en-BW',{hour:'2-digit',minute:'2-digit'}) : '–',
+    sev: p.severity === 'Dangerous' ? 'Serious' : 'Minor'
+  }))].slice(0, 10);
+
   const col = s => s==='Serious'?'var(--danger)':'var(--warn)';
-  ACCIDENT_DATA.forEach(a => {
+  if (combined.length === 0) {
+    al.innerHTML = '<div style="padding:12px 16px;color:var(--tx-3);font-size:12px">No accident reports in past 24h</div>';
+    return;
+  }
+  combined.forEach(a => {
     al.innerHTML += `<div class="acc-row">
       <span class="acc-time">${a.time}</span>
       <span class="acc-road">${a.road}</span>
       <span class="acc-sev" style="color:${col(a.sev)}">${a.sev}</span>
-      <button class="btn btn-ghost btn-sm" onclick="toast('📍 Viewing accident: ${a.road}','warn')" style="font-size:10px">View</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="focusAccident(${a.lat},${a.lng},'${a.road}')">View</button>
     </div>`;
   });
+}
+
+function focusAccident(lat, lng, road) {
+  if (App.map && lat && lng) {
+    goPage('dashboard','nav-map');
+    setTimeout(() => {
+      App.map.setView([lat, lng], 16);
+      toast('📍 Viewing: ' + road, 'warn');
+    }, 200);
+  }
+}
+
+function adminEmailReport() {
+  const urgent = App.potholes.filter(p => (p.risk||0) >= 80 && !p.fixed).length;
+  const total  = App.potholes.filter(p => !p.fixed).length;
+  const subject = encodeURIComponent('SaveLYF Road Report — ' + new Date().toLocaleDateString());
+  const body    = encodeURIComponent(
+    'Road Safety Report — SaveLYF System\n' +
+    'Generated: ' + new Date().toLocaleString() + '\n\n' +
+    'Active Hazards: ' + total + '\n' +
+    'Urgent (Risk 80+): ' + urgent + '\n\n' +
+    'Please log into the SaveLYF Admin Portal for the full priority queue.'
+  );
+  window.location.href = `mailto:roads@gov.bw?subject=${subject}&body=${body}`;
 }
 
 function exportCSV() {
