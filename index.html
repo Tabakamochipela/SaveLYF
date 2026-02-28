@@ -20,6 +20,11 @@
      FREE FIREBASE SDK — Spark Plan (No cost)
      https://console.firebase.google.com → free account
      ════════════════════════════════════════════════════ -->
+<!--
+  ⚠ SECURITY: Firebase credentials are loaded from config.js
+  Add config.js to your .gitignore — never commit it to source control.
+-->
+<script src="config.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -531,15 +536,7 @@ input,select,textarea{font-family:var(--font);outline:none}
   <button class="ib-close" onclick="document.getElementById('install-bar').classList.remove('show')">✕</button>
 </div>
 
-<!-- ════ FIREBASE DEMO BANNER ════ -->
-<div id="fb-banner">
-  <span class="fbb-icon">⚡</span>
-  <div class="fbb-text">
-    <div class="fbb-title">DEMO MODE — Data stored locally</div>
-    <div class="fbb-sub">To enable real-time sync, add your free Firebase config in the code (see DEPLOY guide)</div>
-  </div>
-  <span class="fbb-close" onclick="this.parentElement.classList.remove('show')">✕</span>
-</div>
+<!-- Firebase Demo Banner removed — production mode only -->
 
 <!-- ════ THEME BUTTON ════ -->
 <button id="theme-btn" onclick="toggleTheme()" title="Toggle Day/Night">🌙</button>
@@ -972,17 +969,18 @@ input,select,textarea{font-family:var(--font);outline:none}
    6. In Firebase Console → Build → Authentication → Enable Anonymous
    7. Done! All FREE on Spark plan (50k reads/day)
    ══════════════════════════════════════════ */
-const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyBEJWj2pKQ35y1fG3hHAT9vJb1RoOGGQvs",
-  authDomain:        "savelyf-d809e.firebaseapp.com",
-  projectId:         "savelyf-d809e",
-  storageBucket:     "savelyf-d809e.firebasestorage.app",
-  messagingSenderId: "22404276581",
-  appId:             "1:22404276581:web:28892d0dcf0dccd07dc18c"
-};
+/* ══════════════════════════════════════════
+   FIREBASE CONFIGURATION
+   ─────────────────────────────────────────
+   Config is loaded from config.js (kept outside version control).
+   Never hardcode credentials here. See config.js for setup instructions.
+   ══════════════════════════════════════════ */
+const FIREBASE_CONFIG = (typeof window.SAVELYF_CONFIG !== 'undefined')
+  ? window.SAVELYF_CONFIG
+  : null;
 
-// Auto-detect: if config not set, run in Demo Mode (localStorage only)
-const DEMO_MODE = FIREBASE_CONFIG.apiKey === "AIzaSyBEJWj2pKQ35y1fG3hHAT9vJb1RoOGGQvs";
+// DEMO_MODE is true only when config.js is missing or unpopulated
+const DEMO_MODE = !FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey;
 
 /* ══════════════════════════════════════════
    APP STATE
@@ -991,6 +989,7 @@ const App = {
   // GPS
   gps: { lat: -24.6530, lng: 25.9050, speed: 0, heading: null, accuracy: 9999, valid: false },
   gpsWatchId: null, prevPos: null, prevTime: null,
+  calculatedHeading: null, // derived from position movement when GPS heading is null
 
   // Map
   map: null, tileDark: null, tileLight: null,
@@ -1018,6 +1017,11 @@ const App = {
   // Stats
   userReports: 0, userVerifications: 0,
   selectedSev: 'dangerous',
+
+  // Offline / IndexedDB
+  idb: null,             // IndexedDB connection handle
+  syncedAt: 0,           // timestamp of last successful Firebase sync
+  pendingFlush: false,   // true while flushing the offline queue
 };
 
 /* ══════════════════════════════════════════
@@ -1060,6 +1064,22 @@ async function init() {
     document.getElementById('theme-meta').content = '#F0EDE6';
   }
 
+  // ── STEP 1: Open IndexedDB first — always, before anything else ──
+  try {
+    App.idb = await openIDB();
+    console.log('[SaveLYF] IndexedDB ready');
+  } catch(e) {
+    console.warn('[SaveLYF] IndexedDB unavailable:', e);
+  }
+
+  // ── STEP 2: Pre-load cached potholes from IDB so map is instant ──
+  const cached = await idbLoadPotholes().catch(() => []);
+  if (cached.length > 0) {
+    App.potholes = cached;
+    App.syncedAt = await idbGetSyncedAt();
+    console.log('[SaveLYF] Pre-loaded', cached.length, 'potholes from device cache');
+  }
+
   // Register service worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => {
@@ -1083,23 +1103,45 @@ async function init() {
     }
   };
 
-  // Offline detection
-  window.addEventListener('offline', () => document.getElementById('offline-banner').classList.add('show'));
-  window.addEventListener('online',  () => {
+  // Offline/online detection
+  window.addEventListener('offline', () => {
+    document.getElementById('offline-banner').classList.add('show');
+    updateSyncBadge();
+  });
+  window.addEventListener('online', async () => {
     document.getElementById('offline-banner').classList.remove('show');
-    toast('📡 Back online — syncing data','safe');
-    if (!DEMO_MODE) syncPotholes();
+    updateSyncBadge();
+    if (!DEMO_MODE) {
+      if (App.db) {
+        // Firebase already connected — just flush the queue
+        toast('📡 Back online — syncing offline reports…', 'safe');
+        await flushPendingQueue();
+      } else {
+        // Firebase never connected (was offline from start) — connect now
+        try {
+          await initFirebase();
+          await flushPendingQueue();
+          toast('📡 Connected to Firebase — data synced!', 'safe');
+        } catch(e) {
+          console.warn('[SaveLYF] Firebase reconnect failed:', e);
+        }
+      }
+    }
   });
 
-  // Init Firebase or Demo Mode
+  // ── STEP 3: Connect Firebase or run on device cache ──
   if (!DEMO_MODE) {
     try { await initFirebase(); }
-    catch(e) { console.warn('[SaveLYF] Firebase failed, falling back to demo mode:', e); initDemoMode(); }
+    catch(e) {
+      console.warn('[SaveLYF] Firebase unavailable — running on device cache:', e);
+      if (App.potholes.length === 0) await initDemoMode();
+      toast('📴 Offline — driving on cached road data', 'warn');
+    }
   } else {
-    initDemoMode();
+    await initDemoMode();
   }
 
-  // Init map
+  // Init map — data already loaded from IDB so markers show immediately
   initMap();
 
   // Request GPS after short delay
@@ -1121,9 +1163,158 @@ async function init() {
   setTimeout(() => {
     document.getElementById('splash').classList.add('hide');
     setTimeout(() => document.getElementById('splash').remove(), 600);
-    if (DEMO_MODE) document.getElementById('fb-banner').classList.add('show');
+    if (DEMO_MODE) toast('⚠️ config.js not found — running in local Demo Mode','warn');
     toast('🛡️ SaveLYF active · Gaborone, Botswana','safe');
+    updateSyncBadge();
   }, 2000);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   INDEXEDDB — OFFLINE-FIRST LOCAL DATABASE
+   ─────────────────────────────────────────────────────────
+   3 object stores:
+   • potholes      — mirror of Firebase, keyed by id
+   • pending_queue — actions taken offline, flushed on reconnect
+   • meta          — sync timestamps and app metadata
+   ══════════════════════════════════════════════════════════ */
+const IDB_NAME    = 'savelyf_db';
+const IDB_VERSION = 1;
+
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('potholes')) {
+        const ps = db.createObjectStore('potholes', { keyPath: 'id' });
+        ps.createIndex('severity', 'severity', { unique: false });
+        ps.createIndex('fixed',    'fixed',    { unique: false });
+      }
+      if (!db.objectStoreNames.contains('pending_queue')) {
+        db.createObjectStore('pending_queue', { keyPath: 'qid', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// Write all potholes to local IDB (called after every Firebase snapshot)
+async function idbSavePotholes(potholes) {
+  if (!App.idb) return;
+  const tx = App.idb.transaction(['potholes', 'meta'], 'readwrite');
+  const store = tx.objectStore('potholes');
+  store.clear();
+  potholes.forEach(p => store.put({ ...p }));
+  tx.objectStore('meta').put({ key: 'syncedAt', value: Date.now() });
+  return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+}
+
+// Load all potholes from IDB (used on startup before Firebase connects)
+async function idbLoadPotholes() {
+  if (!App.idb) return [];
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('potholes', 'readonly');
+    const req = tx.objectStore('potholes').getAll();
+    req.onsuccess = e => resolve(e.target.result || []);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// Load the last-sync timestamp from IDB
+async function idbGetSyncedAt() {
+  if (!App.idb) return 0;
+  return new Promise(resolve => {
+    const tx  = App.idb.transaction('meta', 'readonly');
+    const req = tx.objectStore('meta').get('syncedAt');
+    req.onsuccess = e => resolve(e.target.result?.value || 0);
+    req.onerror   = () => resolve(0);
+  });
+}
+
+// Queue an action taken while offline  (type: 'add_pothole' | 'verify' | 'fix_vote')
+async function idbQueueAction(action) {
+  if (!App.idb) return;
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('pending_queue', 'readwrite');
+    const req = tx.objectStore('pending_queue').add({ ...action, queuedAt: Date.now() });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = e  => reject(e.target.error);
+  });
+}
+
+// Return all pending queued actions
+async function idbGetQueue() {
+  if (!App.idb) return [];
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('pending_queue', 'readonly');
+    const req = tx.objectStore('pending_queue').getAll();
+    req.onsuccess = e => resolve(e.target.result || []);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// Remove a flushed action from the queue by its auto-increment key
+async function idbClearQueueItem(qid) {
+  if (!App.idb) return;
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('pending_queue', 'readwrite');
+    const req = tx.objectStore('pending_queue').delete(qid);
+    req.onsuccess = () => resolve();
+    req.onerror   = e  => reject(e.target.error);
+  });
+}
+
+// Compute risk score from severity string
+function calcRisk(severity) {
+  if (severity === 'Dangerous') return 80 + Math.floor(Math.random()*15);
+  if (severity === 'Moderate')  return 50 + Math.floor(Math.random()*20);
+  return 20 + Math.floor(Math.random()*15);
+}
+
+/* ══════════════════════════════════════════
+   OFFLINE QUEUE — FLUSH ON RECONNECT
+   ──────────────────────────────────────────
+   Actions queued while offline are stored in
+   IDB and replayed to Firebase when back online.
+   ══════════════════════════════════════════ */
+async function flushPendingQueue() {
+  if (App.pendingFlush || DEMO_MODE || !App.db) return;
+  const queue = await idbGetQueue();
+  if (!queue.length) return;
+
+  App.pendingFlush = true;
+  toast(`📤 Syncing ${queue.length} offline report${queue.length>1?'s':''}...`, 'brand');
+
+  let succeeded = 0;
+  for (const action of queue) {
+    try {
+      if (action.type === 'add_pothole') {
+        await addPotholeToFirebase(action.data);
+      } else if (action.type === 'fix_vote') {
+        await App.db.collection('potholes').doc(action.id).update({
+          fixVotes: firebase.firestore.FieldValue.increment(1)
+        });
+      } else if (action.type === 'verify') {
+        await App.db.collection('potholes').doc(action.id).update({
+          reports: firebase.firestore.FieldValue.increment(1)
+        });
+      }
+      await idbClearQueueItem(action.qid);
+      succeeded++;
+    } catch(e) {
+      console.error('[SaveLYF] Failed to flush action:', action, e);
+    }
+  }
+
+  App.pendingFlush = false;
+  if (succeeded > 0) {
+    toast(`✅ ${succeeded} offline report${succeeded>1?'s':''} synced to Firebase!`, 'safe');
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -1134,17 +1325,54 @@ async function initFirebase() {
   App.db   = firebase.firestore();
   App.auth = firebase.auth();
 
+  // Enable Firestore offline persistence — Firebase's own disk cache
+  // Works alongside our IDB layer for double-redundancy
+  try {
+    await App.db.enablePersistence({ synchronizeTabs: false });
+    console.log('[SaveLYF] Firestore offline persistence enabled');
+  } catch(e) {
+    if (e.code === 'failed-precondition') {
+      console.warn('[SaveLYF] Persistence limited — multiple tabs open');
+    } else if (e.code === 'unimplemented') {
+      console.warn('[SaveLYF] Persistence not supported in this browser');
+    }
+  }
+
   // Anonymous auth (free, unlimited)
   const result = await App.auth.signInAnonymously();
   App.firebaseUser = result.user;
   console.log('[SaveLYF] Firebase connected · UID:', result.user.uid);
 
   // Seed data if first run
-  const snap = await App.db.collection('potholes').limit(1).get();
+  const snap = await App.db.collection('potholes').limit(1).get({ source: 'server' }).catch(() =>
+    App.db.collection('potholes').limit(1).get()
+  );
   if (snap.empty) await seedFirebase();
 
-  // Real-time listener
-  syncPotholes();
+  // Start real-time listener — every snapshot also writes to IDB
+  listenFirebase();
+}
+
+function listenFirebase() {
+  App.db.collection('potholes').onSnapshot(snap => {
+    App.potholes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    App.syncedAt = Date.now();
+
+    // Mirror every snapshot to IndexedDB so the device stays current
+    idbSavePotholes(App.potholes).catch(e =>
+      console.warn('[SaveLYF] IDB save failed:', e)
+    );
+
+    refreshMapMarkers();
+    refreshInsights();
+    refreshHazardList();
+    refreshAdminStats();
+    updateSyncBadge();
+    console.log('[SaveLYF] Firebase→IDB sync:', App.potholes.length, 'potholes');
+  }, err => {
+    console.error('[SaveLYF] Firestore listener error:', err);
+    toast('⚠️ Firebase sync error — using cached data', 'warn');
+  });
 }
 
 async function seedFirebase() {
@@ -1157,51 +1385,49 @@ async function seedFirebase() {
   console.log('[SaveLYF] Seeded Firebase with Gaborone data');
 }
 
-function syncPotholes() {
-  App.db.collection('potholes').onSnapshot(snap => {
-    App.potholes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    refreshMapMarkers();
-    refreshInsights();
-    refreshHazardList();
-    refreshAdminStats();
-    console.log('[SaveLYF] Sync: ', App.potholes.length, 'potholes');
-  }, err => console.error('[SaveLYF] Firestore error:', err));
-}
-
 async function addPotholeToFirebase(data) {
   if (!App.db) return;
   await App.db.collection('potholes').add({
     ...data, createdAt: Date.now(),
     reportedBy: App.firebaseUser?.uid || 'anon',
-    verified: 0, risk: data.severity === 'Dangerous' ? 80 + Math.floor(Math.random()*15) :
-                       data.severity === 'Moderate' ? 50 + Math.floor(Math.random()*20) : 20 + Math.floor(Math.random()*15)
+    verified: 0, risk: calcRisk(data.severity)
   });
 }
 
+
 /* ══════════════════════════════════════════
-   DEMO MODE (localStorage — no Firebase)
+   DEMO MODE (no config.js — IDB only)
    ══════════════════════════════════════════ */
-function initDemoMode() {
-  console.log('[SaveLYF] Demo mode — using localStorage');
-  const stored = localStorage.getItem('safelyf_potholes');
-  App.potholes = stored ? JSON.parse(stored) : [...SEED_POTHOLES];
-  saveDemoData();
+async function initDemoMode() {
+  console.log('[SaveLYF] Demo mode — IndexedDB only');
+
+  // Load from IDB first; fall back to SEED_POTHOLES if IDB is empty
+  const cached = await idbLoadPotholes().catch(() => []);
+  if (cached.length > 0) {
+    App.potholes = cached;
+    console.log('[SaveLYF] Demo: loaded', cached.length, 'potholes from IDB');
+  } else {
+    App.potholes = [...SEED_POTHOLES];
+    await idbSavePotholes(App.potholes).catch(() => {});
+  }
 }
 
+// Kept for compatibility — in live mode IDB handles persistence
 function saveDemoData() {
-  localStorage.setItem('safelyf_potholes', JSON.stringify(App.potholes));
+  idbSavePotholes(App.potholes).catch(() => {
+    // IndexedDB fallback: localStorage as last resort
+    try { localStorage.setItem('safelyf_potholes_bk', JSON.stringify(App.potholes)); } catch(_){}
+  });
 }
 
 function addPotholeLocal(data) {
   const id = 'u' + Date.now();
   const newP = {
     id, ...data, createdAt: Date.now(), reportedBy: 'local',
-    verified: 0, fixed: false,
-    risk: data.severity === 'Dangerous' ? 80 + Math.floor(Math.random()*15) :
-          data.severity === 'Moderate'  ? 50 + Math.floor(Math.random()*20) : 20 + Math.floor(Math.random()*15)
+    verified: 0, fixed: false, risk: calcRisk(data.severity)
   };
   App.potholes.push(newP);
-  saveDemoData();
+  idbSavePotholes(App.potholes).catch(() => {});
   refreshMapMarkers();
   refreshInsights();
   refreshHazardList();
@@ -1336,21 +1562,53 @@ function verifyHazard(status) {
   document.getElementById('mtt').classList.remove('show');
   const id = document.getElementById('mtt')._currentId;
   if (status === 'fixed' && id) {
+    if (!App.adminLoggedIn) {
+      // Non-admin: submit a fix-vote locally + queue for Firebase
+      const p = App.potholes.find(x => x.id === id);
+      if (p) { p.fixVotes = (p.fixVotes || 0) + 1; }
+      idbSavePotholes(App.potholes).catch(() => {});
+      if (!DEMO_MODE && navigator.onLine && App.db) {
+        App.db.collection('potholes').doc(id).update({
+          fixVotes: firebase.firestore.FieldValue.increment(1)
+        });
+      } else if (!DEMO_MODE) {
+        idbQueueAction({ type: 'fix_vote', id }).catch(() => {});
+      }
+      toast('🔧 Fix report saved — will sync when online','warn');
+      App.userVerifications++;
+      document.getElementById('p-verif').textContent = App.userVerifications;
+      return;
+    }
+    // Admin: mark as fixed in Firebase permanently
     const p = App.potholes.find(x => x.id === id);
-    if (p) { p.fixed = true; p.severity = 'Fixed'; p.risk = 0; p.reports = 0; }
-    if (!DEMO_MODE && App.db) App.db.collection('potholes').doc(id).update({fixed:true,severity:'Fixed',risk:0});
-    else saveDemoData();
+    if (p) { p.fixed = true; p.severity = 'Fixed'; p.risk = 0; }
+    if (!DEMO_MODE && navigator.onLine && App.db) {
+      App.db.collection('potholes').doc(id).update({
+        fixed: true, severity: 'Fixed', risk: 0,
+        fixedAt: Date.now(), fixedBy: App.adminRole
+      });
+      // IDB is updated by the Firebase snapshot listener
+    } else {
+      idbSavePotholes(App.potholes).catch(() => {});
+    }
     refreshMapMarkers(); refreshInsights(); refreshAdminStats();
-    toast('🔧 Fixed report submitted — thank you!','safe');
+    toast('✅ Pothole marked as FIXED in database — road cleared!','safe');
     App.userVerifications++;
     document.getElementById('p-verif').textContent = App.userVerifications;
   } else {
+    // Verify still exists — increment report count
     const p = App.potholes.find(x => x.id === id);
     if (p) { p.reports++; }
-    if (!DEMO_MODE && App.db) App.db.collection('potholes').doc(id).update({ reports: firebase.firestore.FieldValue.increment(1) });
-    else saveDemoData();
+    idbSavePotholes(App.potholes).catch(() => {});
+    if (!DEMO_MODE && navigator.onLine && App.db) {
+      App.db.collection('potholes').doc(id).update({
+        reports: firebase.firestore.FieldValue.increment(1)
+      });
+    } else if (!DEMO_MODE) {
+      idbQueueAction({ type: 'verify', id }).catch(() => {});
+    }
     refreshInsights();
-    toast('✅ Verification submitted — pothole confirmed','safe');
+    toast('✅ Verification saved — pothole confirmed','safe');
     App.userVerifications++;
     document.getElementById('p-verif').textContent = App.userVerifications;
   }
@@ -1424,6 +1682,21 @@ function handleGPS(pos) {
   }
 
   App.gps = { lat, lng, speed: Math.min(200, spd), heading, accuracy, valid: true };
+
+  // Compute heading from movement when GPS doesn't provide one
+  if (App.prevPos) {
+    const moveDist = haversine(App.prevPos.lat, App.prevPos.lng, lat, lng);
+    if (moveDist > 3) { // only update if moved at least 3m to avoid noise
+      App.calculatedHeading = bearingTo(App.prevPos.lat, App.prevPos.lng, lat, lng);
+    }
+  }
+  // Use GPS-provided heading if available, otherwise use calculated
+  if (heading !== null && heading !== undefined) {
+    App.gps.heading = heading;
+  } else {
+    App.gps.heading = App.calculatedHeading;
+  }
+
   App.prevPos = { lat, lng };
   App.prevTime = pos.timestamp;
 
@@ -1486,23 +1759,53 @@ function updateDriveStats(lat, lng, spd, hdg, acc) {
 }
 
 /* ══════════════════════════════════════════
+   BEARING & DIRECTION UTILITIES
+   ══════════════════════════════════════════ */
+function bearingTo(lat1, lng1, lat2, lng2) {
+  // Returns compass bearing (0–360°) from point 1 to point 2
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const φ1   = lat1 * Math.PI / 180;
+  const φ2   = lat2 * Math.PI / 180;
+  const y    = Math.sin(dLng) * Math.cos(φ2);
+  const x    = Math.cos(φ1)  * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function angularDiff(a, b) {
+  // Smallest angular difference between two bearings (0–180°)
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+function isAhead(potholeLat, potholeLng) {
+  // Returns true if the pothole is within the forward cone (±90°) of travel.
+  // When speed is very low or heading is unknown, treat all potholes as ahead.
+  const heading = App.gps.heading;
+  if (heading === null || heading === undefined || App.gps.speed < 5) return true;
+  const bearing = bearingTo(App.gps.lat, App.gps.lng, potholeLat, potholeLng);
+  return angularDiff(heading, bearing) <= 90;
+}
+
+/* ══════════════════════════════════════════
    PROXIMITY ALERTS
    ══════════════════════════════════════════ */
 function checkProximityAlerts() {
   if (!App.voiceOn || App.alertCooldown) return;
 
-  let closestDangerous = null, closestDist = Infinity;
+  let closestAhead = null, closestDist = Infinity;
+
   App.potholes.filter(p => !p.fixed && p.severity !== 'Fixed').forEach(p => {
     const dist = haversine(App.gps.lat, App.gps.lng, p.lat, p.lng);
-    if (dist < 500 && dist < closestDist) {
-      closestDist = dist;
-      closestDangerous = p;
+    // Only consider potholes within 500m that are in the direction of travel
+    if (dist < 500 && isAhead(p.lat, p.lng) && dist < closestDist) {
+      closestDist  = dist;
+      closestAhead = p;
     }
   });
 
-  if (closestDangerous && closestDangerous.id !== App.lastAlertId) {
-    triggerAlert(closestDangerous, Math.round(closestDist));
-    App.lastAlertId = closestDangerous.id;
+  if (closestAhead && closestAhead.id !== App.lastAlertId) {
+    triggerAlert(closestAhead, Math.round(closestDist));
+    App.lastAlertId = closestAhead.id;
     App.alertCooldown = true;
     setTimeout(() => { App.alertCooldown = false; App.lastAlertId = null; }, 45000);
   }
@@ -1510,18 +1813,31 @@ function checkProximityAlerts() {
 
 function triggerAlert(p, dist) {
   const isSerious = p.severity === 'Dangerous';
+
+  // Compute directional label for display
+  let dirLabel = 'ahead';
+  if (App.gps.heading !== null && App.gps.heading !== undefined && App.gps.speed >= 5) {
+    const bearing = bearingTo(App.gps.lat, App.gps.lng, p.lat, p.lng);
+    const diff    = angularDiff(App.gps.heading, bearing);
+    // Determine if it's slightly left, right, or straight ahead
+    const rel = ((bearing - App.gps.heading) + 360) % 360;
+    if (diff < 20)        dirLabel = 'straight ahead';
+    else if (rel < 180)   dirLabel = 'ahead-right';
+    else                  dirLabel = 'ahead-left';
+  }
+
   const slide = document.getElementById('alert-slide');
   slide.className = 'alert-slide show ' + (isSerious ? 'alert-danger-bg' : 'alert-warn-bg');
   document.getElementById('al-title').textContent = p.severity.toUpperCase() + ' POTHOLE';
-  document.getElementById('al-sub').textContent   = `${dist}m ahead · ${p.road}`;
+  document.getElementById('al-sub').textContent   = `${dist}m ${dirLabel} · ${p.road}`;
   setTimeout(() => slide.classList.remove('show'), 7000);
 
   // Update bottom bar
   document.getElementById('spd-road').textContent   = p.road;
-  document.getElementById('spd-hazard').textContent = `${isSerious?'⚠':'!'} Pothole ${dist}m`;
+  document.getElementById('spd-hazard').textContent = `${isSerious?'⚠':'!'} Pothole ${dist}m ${dirLabel}`;
 
   // Voice
-  const msg = `Warning! ${p.severity} pothole on ${p.road} in ${dist} meters. Please reduce your speed.`;
+  const msg = `Warning! ${p.severity} pothole ${dirLabel} on ${p.road} in ${dist} meters. Please reduce your speed.`;
   speak(msg, isSerious);
 
   // Voice popup
@@ -1583,22 +1899,30 @@ async function submitReport() {
   const notes = document.getElementById('f-notes').value.trim();
   const sevMap = { dangerous:'Dangerous', moderate:'Moderate', low:'Low Risk' };
   const data = {
-    lat: App.gps.lat + (Math.random()-.5)*.001, // slight offset for demo variety
-    lng: App.gps.lng + (Math.random()-.5)*.001,
+    lat: App.gps.lat,
+    lng: App.gps.lng,
     road, severity: sevMap[App.selectedSev],
     reports: 1, notes
   };
 
   closeModal('report-modal');
-  document.getElementById('f-road').value = '';
+  document.getElementById('f-road').value  = '';
   document.getElementById('f-notes').value = '';
 
-  if (!DEMO_MODE && App.db) {
-    await addPotholeToFirebase(data);
-    toast(`📍 "${road}" synced to Firebase real-time!`, 'safe');
+  if (!DEMO_MODE) {
+    if (navigator.onLine && App.db) {
+      // Online — write directly to Firebase (snapshot listener updates IDB)
+      await addPotholeToFirebase(data);
+      toast(`📍 "${road}" sent to Firebase!`, 'safe');
+    } else {
+      // Offline — save to IDB immediately + queue for Firebase later
+      addPotholeLocal(data);
+      await idbQueueAction({ type: 'add_pothole', data }).catch(() => {});
+      toast(`📴 "${road}" saved to device — will sync when online`, 'warn');
+    }
   } else {
     addPotholeLocal(data);
-    toast(`📍 "${road}" saved locally (Demo Mode)`, 'brand');
+    toast(`📍 "${road}" saved to device (Demo Mode)`, 'brand');
   }
 
   App.userReports++;
@@ -1898,16 +2222,56 @@ function populateAdminTable() {
   const priClass = r => r>80?'pri-urgent':r>60?'pri-high':r>40?'pri-medium':'pri-low';
   const priLabel = r => r>80?'URGENT':r>60?'HIGH':r>40?'MEDIUM':'LOW';
   data.forEach((p,i) => {
+    const fixVotes = p.fixVotes || 0;
     tb.innerHTML += `<tr>
       <td style="font-family:var(--mono)">${i+1}</td>
       <td style="font-weight:700">${p.road}</td>
       <td style="color:var(--tx-2)">Gaborone</td>
       <td style="font-family:var(--mono);color:var(--brand)">${p.reports||0}</td>
-      <td><span class="pri ${priClass(p.risk||0)}">${priLabel(p.risk||0)}</span></td>
+      <td><span class="pri ${priClass(p.risk||0)}">${priLabel(p.risk||0)}</span>${fixVotes>0?`<br><span style="font-size:9px;color:var(--safe)">🔧 ${fixVotes} fix vote${fixVotes>1?'s':''}</span>`:''}</td>
       <td style="font-family:var(--mono);font-weight:700;color:${(p.risk||0)>75?'var(--danger)':(p.risk||0)>50?'var(--warn)':'var(--safe)'}">${p.risk||0}</td>
-      <td><button class="btn btn-safe btn-sm" style="font-size:10px;padding:5px 9px" onclick="toast('🔧 Repair order issued for ${p.road}','safe')">Issue</button></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-safe btn-sm" style="font-size:10px;padding:5px 9px" onclick="adminIssueRepair('${p.id}','${p.road}')">Issue</button>
+        <button class="btn btn-brand btn-sm" style="font-size:10px;padding:5px 9px" onclick="adminMarkFixed('${p.id}','${p.road}')">✓ Fixed</button>
+      </td>
     </tr>`;
   });
+}
+
+function adminIssueRepair(id, road) {
+  toast(`🔧 Repair order issued for ${road} — team notified`, 'safe');
+  if (!DEMO_MODE && navigator.onLine && App.db) {
+    App.db.collection('potholes').doc(id).update({ repairOrdered: true, repairOrderedAt: Date.now() });
+  }
+}
+
+function adminMarkFixed(id, road) {
+  // Only admin can mark as fixed — updates IDB immediately, Firebase when online
+  const p = App.potholes.find(x => x.id === id);
+  if (p) { p.fixed = true; p.severity = 'Fixed'; p.risk = 0; }
+
+  // Always update device cache immediately
+  idbSavePotholes(App.potholes).catch(() => {});
+
+  if (!DEMO_MODE && navigator.onLine && App.db) {
+    // Online: write to Firebase (snapshot will confirm IDB is up to date)
+    App.db.collection('potholes').doc(id).update({
+      fixed: true, severity: 'Fixed', risk: 0, reports: 0,
+      fixedAt: Date.now(), fixedBy: App.adminRole
+    });
+    toast(`✅ ${road} marked as FIXED in database`, 'safe');
+  } else if (!DEMO_MODE) {
+    // Offline: IDB already updated; note admin fix does NOT use queue —
+    // admin must confirm again when back online for safety
+    toast(`⚠️ Offline — ${road} fixed locally. Confirm on Firebase when online.`, 'warn');
+  } else {
+    toast(`✅ ${road} marked as Fixed (Demo Mode)`, 'safe');
+  }
+
+  // Refresh the admin table (reset init flag so it re-renders)
+  const tb = document.getElementById('admin-tbody');
+  if (tb) { tb._init = false; tb.innerHTML = ''; populateAdminTable(); }
+  refreshMapMarkers(); refreshInsights(); refreshAdminStats();
 }
 
 function populateAccidentList() {
@@ -1948,6 +2312,27 @@ function haversine(lat1, lng1, lat2, lng2) {
   const dLng = (lng2-lng1)*Math.PI/180;
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Update the GPS status pill to show sync state and pending offline actions
+async function updateSyncBadge() {
+  const el  = document.getElementById('gps-acc-txt');
+  if (!el) return;
+
+  const isOnline = navigator.onLine;
+  if (!isOnline) {
+    // Show how many actions are pending sync
+    const queue = await idbGetQueue().catch(() => []);
+    const pending = queue.length;
+    const age = App.syncedAt
+      ? Math.round((Date.now() - App.syncedAt) / 60000) + 'm ago'
+      : 'never';
+    el.textContent = pending > 0
+      ? `OFFLINE · ${pending} pending · synced ${age}`
+      : `OFFLINE · cached ${age}`;
+  } else if (App.syncedAt) {
+    el.textContent = `±${Math.round(App.gps.accuracy || 99)}m · synced`;
+  }
 }
 
 function updateClock() {
